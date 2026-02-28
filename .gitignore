@@ -1,0 +1,49 @@
+# ── Virtual environment ───────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Data (videos, frames, crops, annotations) ────────────────────────
+data/
+
+# ── Installed / downloaded model weights ──────────────────────────────
+*.pth
+*.pt
+*.bin
+*.onnx
+*.safetensors
+
+# ── ChromaDB persistent storage ──────────────────────────────────────
+video_index_db/
+chroma_db/
+
+# ── Video registry (generated at runtime) ─────────────────────────────
+video_registry.json
+src/streamlit/video_registry.json
+
+# ── Main script (use Streamlit app instead) ───────────────────────────
+main.py
+
+# ── Python cache ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── IDE / editor ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS files ──────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+
+# ── Misc ──────────────────────────────────────────────────────────────
+*.log
+.env

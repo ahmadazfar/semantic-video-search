@@ -1,0 +1,6 @@
+def merge_audio(original_path, processed_path, final_path):
+    # The logic remains the same
+    with VideoFileClip(original_path) as original_clip:
+        with VideoFileClip(processed_path) as processed_clip:
+            final_clip = processed_clip.with_audio(original_clip.audio)
+            final_clip.write_videofile(final_path, codec="libx264")
