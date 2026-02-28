@@ -1,0 +1,19 @@
+# ── Core ──────────────────────────────────────────────────────────────
+torch
+torchvision
+numpy
+opencv-python
+Pillow
+
+# ── Object Detection & Tracking ──────────────────────────────────────
+rfdetr
+supervision
+
+# ── Embeddings & LLMs ────────────────────────────────────────────────
+transformers
+
+# ── Vector Database ───────────────────────────────────────────────────
+chromadb
+
+# ── Web UI ────────────────────────────────────────────────────────────
+streamlit
