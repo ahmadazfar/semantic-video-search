@@ -1,7 +1,7 @@
 import streamlit as st
 
 def render_landing_page():
-    """Render the landing / home page for Video Search AI."""
+    """Render the landing / home page for Semantic Video Search."""
 
     # ── Hero Section ──────────────────────────────────────────────────────
     st.markdown(
@@ -234,7 +234,7 @@ def render_landing_page():
         """
         <div class="hero-container">
             <div class="badge">AI-Powered Video Intelligence</div>
-            <div class="hero-title">Video Search AI</div>
+            <div class="hero-title">Semantic Video Search</div>
             <div class="hero-subtitle">
                 Find any object in any video using natural language.
                 Upload, index, and search — powered by RF-DETR, CLIP, and ChromaDB.
@@ -244,37 +244,11 @@ def render_landing_page():
         unsafe_allow_html=True,
     )
 
-    # Stats
-    st.markdown(
-        """
-        <div class="stats-row">
-            <div class="stat-item">
-                <div class="stat-num">5</div>
-                <div class="stat-label">Core Modules</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-num">3</div>
-                <div class="stat-label">ML Models</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-num">60 fps</div>
-                <div class="stat-label">Tracking Speed</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-num">&lt;1s</div>
-                <div class="stat-label">Query Latency</div>
-            </div>
-        </div>
-        <div class="fancy-divider"></div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     # ── Feature Cards ─────────────────────────────────────────────────────
     st.markdown(
         """
         <div class="section-header">What It Does</div>
-        <div class="section-sub">Semantic video search from upload to annotated result — no manual labeling required.</div>
+        <div class="section-sub">Semantic video search from uploaded videos to find whatever you are looking for.</div>
 
         <div class="features-grid">
             <div class="feature-card">
@@ -288,12 +262,12 @@ def render_landing_page():
                 <div class="feature-icon">🔍</div>
                 <div class="feature-title">Natural Language Search</div>
                 <div class="feature-desc">
-                    Type a query like <em>"red truck"</em> or <em>"person with backpack"</em> and instantly find matching timestamps.
+                    Type a query like <em>"red truck"</em> or <em>"person with blue backpack"</em> to find matching timestamps from videos selected.
                 </div>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🎯</div>
-                <div class="feature-title">Top-K Annotated Output</div>
+                <div class="feature-title"> Annotated Output</div>
                 <div class="feature-desc">
                     Get an annotated video clip highlighting only the objects that best match your query with similarity scores.
                 </div>
@@ -376,40 +350,6 @@ def render_landing_page():
 
     st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
 
-    # ── Architecture Diagram ──────────────────────────────────────────────
-    st.markdown(
-        """
-        <div class="section-header">Architecture</div>
-        <div class="section-sub">End-to-end flow from user input to annotated video output.</div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        ```mermaid
-        graph TD
-            A[👤 User] -->|Upload Video / Text Query| B[Streamlit Web App]
-            B -->|Index Pipeline| C[Object Detection Processor]
-            B -->|Search Pipeline| D[Embedding Module]
-
-            C -->|RF-DETR Detection| E[Object Crops]
-            C -->|ByteTrack Tracking| F[Track IDs + Timestamps]
-            E -->|CLIP Encoding| G[Average Embeddings]
-            G -->|Store| H[(ChromaDB)]
-            F -->|Store Metadata| H
-
-            D -->|CLIP Text Encoding| I[Query Vector]
-            I -->|Cosine Search| H
-            H -->|Timestamps| J[Queried Detection]
-            J -->|Annotated Clip| B
-            B -->|Display Video| A
-        ```
-        """
-    )
-
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-
     # ── Tech Stack ────────────────────────────────────────────────────────
     st.markdown(
         """
@@ -426,8 +366,6 @@ def render_landing_page():
         ("📐", "Optical Flow (LK)"),
         ("🗄️", "ChromaDB"),
         ("📹", "OpenCV"),
-        ("🎬", "MoviePy"),
-        ("📦", "PyAV"),
         ("🖥️", "Streamlit"),
         ("🐍", "Python"),
         ("⚡", "CUDA / GPU"),
@@ -441,50 +379,6 @@ def render_landing_page():
 
     st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
 
-    # ── Module Breakdown ──────────────────────────────────────────────────
-    st.markdown(
-        """
-        <div class="section-header">Core Modules</div>
-        <div class="section-sub">What each file is responsible for.</div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    modules = [
-        (
-            "⚙️",
-            "object_detection_processor.py",
-            "The indexing engine. Runs RF-DETR every 5 frames with optical-flow interpolation, "
-            "ByteTrack for persistent IDs, stationary filtering, padded cropping, and batch CLIP embedding.",
-        ),
-        (
-            "🔗",
-            "embedding.py",
-            "Loads the CLIP model and manages ChromaDB. Provides index_video() for scene-level "
-            "indexing and search_index() for text-to-vector cosine search filtered by video name.",
-        ),
-        (
-            "🎯",
-            "queried_detection.py",
-            "Seeks to a timestamp range, re-detects objects, embeds each crop in real-time, "
-            "computes cosine similarity against the query, and annotates only the top-K matches.",
-        ),
-        (
-            "🧠",
-            "multimodal_processor.py",
-            "Experimental module using Video-LLaVA 7B for natural-language video QA "
-            '(e.g., "At what timestamp does the bus enter the frame?").',
-        ),
-        (
-            "🖥️",
-            "streamlit/app.py",
-            "Three-page web UI: Upload & Index, Search Indexed Videos, and Object Detection viewer.",
-        ),
-    ]
-
-    for icon, name, desc in modules:
-        with st.expander(f"{icon}  **{name}**", expanded=False):
-            st.write(desc)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.markdown(
