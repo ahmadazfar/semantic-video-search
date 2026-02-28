@@ -1,4 +1,4 @@
-# Video Search AI
+# Semantic Video Search
 
 A real-time video object detection, tracking, and natural-language search system. Upload any video, automatically detect and track every object with **RF-DETR** + **ByteTrack**, embed them with **CLIP**, and retrieve segments by typing plain-English queries — all through a Streamlit web UI.
 
@@ -157,3 +157,4 @@ All tunable parameters live in [src/config.py](src/config.py):
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 "# semantic-video-search" 
+
