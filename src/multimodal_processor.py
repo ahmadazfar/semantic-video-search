@@ -39,4 +39,6 @@ query = "USER: <video>\nAt what timestamp does the bus enter the frame?? ASSISTA
 inputs = processor(text=query, videos=video_clip, return_tensors="pt").to("cuda", torch.float16)
 out = model.generate(**inputs, max_new_tokens=100)
 
-print(processor.batch_decode(out, skip_special_tokens=True)[0])
+from logger import get_logger
+logger = get_logger(__name__)
+logger.info(processor.batch_decode(out, skip_special_tokens=True)[0])

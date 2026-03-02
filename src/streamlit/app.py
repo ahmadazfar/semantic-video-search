@@ -9,6 +9,9 @@ from queried_detection import run_detection_on_timestamp
 from landing import render_landing_page
 from db import get_indexed_videos
 from video_manager import *
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 # Assuming your functions are in 'logic.py'
 # from logic import run_indexing, run_top_k_detection, load_models
@@ -92,7 +95,7 @@ elif page == "Object Detection":
     else:
         selected_video = st.selectbox("Select an indexed video for object detection", video_list)
         video_path = get_path_from_registry(selected_video, "annotated")
-        print(f"Selected video path for annotation: {video_path}")
+        logger.info(f"Selected video path for annotation: {video_path}")
         if os.path.exists(video_path):
             with open(video_path, "rb") as v_file:
                 st.video(v_file.read(), format="video/mp4")

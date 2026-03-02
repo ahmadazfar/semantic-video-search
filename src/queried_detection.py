@@ -9,12 +9,12 @@ from model import get_detector
 from utils import timestamp_to_seconds
 from db import get_collection
 import supervision as sv
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
-def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb, video_name):
-
-    # Annotators
-    color = sv.ColorPalette.from_hex(COLOR_PALETTE_HEX)
+def run_detection_on_timestamp(video_path: str, start_seconds: str, end_seconds: str, query_emb: list, video_name: str) -> str  :
 
     # Get Model
     model = get_detector()
@@ -22,6 +22,14 @@ def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     
+
+    # State for tracking
+    state = TrackState()
+
+    # Annotators
+    color = sv.ColorPalette.from_hex(COLOR_PALETTE_HEX)
+
+
     # Seek directly to the starting frame
     start_seconds = timestamp_to_seconds(start_seconds)
     end_seconds = timestamp_to_seconds(end_seconds)
@@ -33,12 +41,16 @@ def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb
 
     state = TrackState()
 
+    tracker = ByteTrack(lost_track_buffer=LOST_TRACK_BUFFER,track_activation_threshold=0.25,   # lower = keep more tentative tracks
+    minimum_matching_threshold=0.7,     # lower = more lenient matching
+    frame_rate=30   )
+
+    reid_tracker = ReIDTracker(tracker, reid_threshold=REID_THRESHOLD, max_lost_age=REID_MAX_LOST_AGE)
+
     output_path = os.path.join(QUERIED_DETECTIONS_DIR, f"{video_name}_queried_detection.mp4")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    tracker = ByteTrack(lost_track_buffer=LOST_TRACK_BUFFER,track_activation_threshold=0.25,   # lower = keep more tentative tracks
-        minimum_matching_threshold=0.7,     # lower = more lenient matching
-        frame_rate=30   )
+
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -54,6 +66,8 @@ def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb
     detections = model.predict(frame_prev)
     centers = detections.get_anchors_coordinates(anchor=sv.Position.CENTER)
     points_prev = centers.reshape(-1, 1, 2).astype(np.float32)
+
+    start_time = time.time()
 
     while current_frame <= end_frame:
         ret, frame = cap.read()
@@ -78,29 +92,35 @@ def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb
             smart_position=True
         )
 
-        if current_frame % DETECTION_INTERVAL == 0: # Do full detection every N frames to correct for drift
+        if current_frame % DETECTION_INTERVAL == 0 or current_frame == start_frame: # Do full detection every N frames to correct for drift
             # Expensive detection
             detections = model.predict(image, threshold=0.5)
+            mask = np.isin(detections.class_id, [1]) # Only person class for now to save time, can expand later
+            detections = detections[mask]
             centers = detections.get_anchors_coordinates(anchor=sv.Position.CENTER)
             points_prev = centers.reshape(-1, 1, 2).astype(np.float32)
             tracked = tracker.update_with_detections(detections)
-        
+            for i, tid in enumerate(tracked.tracker_id):
+                    if tid in reid_tracker.id_mapping:
+                        tracked.tracker_id[i] = reid_tracker.resolve_id(tid)
         else: # Use optical flow to shift detections in between
-            tracked, points_prev, detections = flow_update(gray_prev, gray_curr, points_prev, detections, tracker)
+            points_prev, detections = flow_update(gray_prev, gray_curr, points_prev, detections, tracker)
+           
 
         gray_prev = gray_curr.copy()
 
-        #Labels from RF-DETR
-        labels = [
-            f"{COCO_CLASSES[class_id]} {conf:.2f} ID:{tid}"
-            for class_id, conf, tid in zip(
-                tracked.class_id, tracked.confidence, tracked.tracker_id
-            )
-        ]
+        # #Labels from RF-DETR
+        # labels = [
+        #     f"{COCO_CLASSES[class_id]} {conf:.2f} ID:{tid}"
+        #     for class_id, conf, tid in zip(
+        #         tracked.class_id, tracked.confidence, tracked.tracker_id
+        #     )
+        # ]
 
         # Crop every N frames (N = fps / divisor)
         if current_frame % int(fps/CROP_INTERVAL_DIVISOR) == 0 or current_frame == start_frame:
-            crop_object(tracked, frame, current_frame, state, fps, video_name) 
+            current_ids = set()
+            crop_object(tracked, frame, current_frame, state, fps, video_name, reid_tracker, current_ids) 
             create_embeddings_for_crops(state)
             top_k_match = find_and_target_object(query_emb, state.all_embeddings,1)
 
@@ -125,6 +145,9 @@ def run_detection_on_timestamp(video_path, start_seconds, end_seconds, query_emb
         current_frame += 1
     out.release()
     cap.release()
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"Queried detection completed in {elapsed_time:.2f} seconds. Output saved to {output_path}")
 
     # output_path = convert_to_h264(output_path)
     return output_path

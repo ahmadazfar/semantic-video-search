@@ -11,3 +11,4 @@ class TrackState:
     all_embeddings: dict = field(default_factory=dict)   # tid -> embedding list
     first_seen: dict = field(default_factory=dict)   # tid -> timestamp string
     last_seen: dict = field(default_factory=dict)   # tid -> timestamp string
+    pending_finalize: dict = field(default_factory=dict)  # tid -> {"age": int, "embedding": list}

@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 from config import CROP_PADDING_PERCENT, CROP_TARGET_SIZE
+from logger import get_logger
 
+logger = get_logger(__name__)
 
 def get_timestamp(frame_num: int, fps: float) -> str:
     total_seconds = frame_num / fps
@@ -51,3 +53,35 @@ def resize_with_padding(image: np.ndarray, target_size=CROP_TARGET_SIZE) -> np.n
     canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
     
     return canvas
+
+def _parse_timestamp(ts) -> float:
+    """Parse timestamp string or number to seconds."""
+    if ts is None:
+        return None
+
+    # Already a number
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    logger.debug(f"Parsing timestamp: {ts}")
+    # String format: "00:11" or "00:01:11" or "11.5"
+    ts = str(ts).strip()
+
+    try:
+        # Try direct float
+        return float(ts)
+    except ValueError:
+        pass
+
+    try:
+        parts = ts.split(":")
+        if len(parts) == 2:
+            # MM:SS
+            return int(parts[0]) * 60 + float(parts[1])
+        elif len(parts) == 3:
+            # HH:MM:SS
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    except (ValueError, IndexError):
+        pass
+
+    logger.warning(f"Could not parse timestamp: '{ts}'")
+    return None

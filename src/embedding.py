@@ -4,10 +4,14 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 from PIL import Image
-from config import DEVICE, EMBEDDING_BATCH_SIZE
+from config import DEVICE, EMBEDDING_BATCH_SIZE, TOP_K_CROPS
 from db import get_collection
 from state import TrackState
 from model import get_multimodal_model, get_clip_model
+from logger import get_logger
+from utils import _parse_timestamp
+
+logger = get_logger(__name__)
 
 def index_video(video_path: str, video_name: str) -> None:
     model, processor = get_clip_model()
@@ -37,12 +41,12 @@ def index_video(video_path: str, video_name: str) -> None:
                 metadatas=[{"timestamp": timestamp, "type": "scene"}],
                 ids=[f"frame_{frame_idx}"]
             )
-            print(f"Indexed: {timestamp}s")
+            logger.info(f"Indexed: {timestamp}s")
             
         frame_idx += 1
     cap.release()
 
-def search_index(query_text: str, video_name: str)  -> tuple:
+def search_index(query_text: str, video_name: str, min_duration: float = 1.0)  -> tuple:
     model, processor = get_clip_model()
     collection = get_collection()
 
@@ -54,24 +58,49 @@ def search_index(query_text: str, video_name: str)  -> tuple:
 
     results = collection.query(
         query_embeddings=[query_emb],
-        n_results=1,
+        n_results=10,
         where={"video_name": video_name},
         include=["metadatas", "distances"]
     )
 
-    # Extract the timestamps
-    for i in range(len(results['ids'][0])):
-        best_match_meta = results['metadatas'][0][i] # Get first result's metadata
-        dist = results['distances'][0][i]
-        
-        start = best_match_meta['first_seen']
-        end = best_match_meta['last_seen']
-        
-        # print(f"Match Found! (Distance: {dist:.4f})")
-        # print(f"Object first appeared at: {start} seconds")
-        # print(f"Object disappeared at: {end} seconds")
+    if not results["ids"][0]:
+        logger.warning(f"No results found for query: '{query_text}'")
+        return None, None, query_emb
 
-        return start, end, query_emb
+    # Find best result that has a meaningful duration
+    for i in range(len(results["ids"][0])):
+        meta = results["metadatas"][0][i]
+        dist = results["distances"][0][i]
+
+        start = meta["first_seen"]
+        end = meta["last_seen"]
+
+        # Parse timestamps to check duration
+        start_sec = _parse_timestamp(start)
+        end_sec = _parse_timestamp(end)
+
+        if start_sec is None or end_sec is None:
+            continue
+
+        duration = end_sec - start_sec
+
+        if duration >= min_duration:
+            logger.info(
+                f"Search match: '{query_text}' → track {meta.get('track_id', '?')} "
+                f"({start} → {end}, dist={dist:.4f})"
+            )
+            return start, end, query_emb
+
+        logger.debug(
+            f"Skipping result #{i}: track {meta.get('track_id', '?')} "
+            f"duration={duration:.1f}s < {min_duration}s ({start} → {end})"
+        )
+
+    # Fallback: no result met the duration threshold
+    logger.warning(
+        f"No result with duration >= {min_duration}s for query: '{query_text}'"
+    )
+    return None, None, query_emb
 
 
 def get_average_embedding(crops: list, batch_size=EMBEDDING_BATCH_SIZE) -> list:
@@ -97,22 +126,38 @@ def get_average_embedding(crops: list, batch_size=EMBEDDING_BATCH_SIZE) -> list:
     return average_embedding.cpu().numpy().flatten().tolist()
 
 
-def add_collection(video_name: str, embedding: list, track_buffers: dict, tid: int) -> None:
+def add_collection(video_name: str, embeddings: list, state: TrackState, tid: int) -> None:
     collection = get_collection()
 
-    buffer_data = track_buffers.get(tid, [])
-    
-    timestamps = [item["timestamp"] for item in buffer_data]
+    first_seen = state.first_seen.get(tid, "unknown")
+    last_seen = state.last_seen.get(tid, "unknown")
 
-    unique_id = f"{video_name}_object_{tid}"
+    # Normalize: ensure embeddings is always a list of lists
+    # A flat list [0.1, 0.2, ...] means a single embedding → wrap it
+    if embeddings and not isinstance(embeddings[0], list):
+        embeddings = [embeddings]
 
-    collection.add(
-                embeddings=[embedding],
-                metadatas=[{"video_name":video_name,"first_seen": min(timestamps), "last_seen": max(timestamps),"type": "object"}],
-                ids=[unique_id]
-            )
+    # Store each embedding as a separate entry (same metadata, different IDs)
+    ids = []
+    metas = []
+    for i in range(len(embeddings)):
+        ids.append(f"{video_name}_object_{tid}_crop_{i}")
+        metas.append({
+            "video_name": video_name,
+            "first_seen": first_seen,
+            "last_seen": last_seen,
+            "type": "object",
+            "track_id": int(tid),
+            "crop_index": i,
+        })
+
+    collection.upsert(
+        embeddings=embeddings,
+        metadatas=metas,
+        ids=ids,
+    )
     
-    return print("Added object with track ID", tid, "to ChromaDB with metadata:", {"video_name":video_name,"first_seen": min(timestamps), "last_seen": max(timestamps),"type": "object"})
+    logger.info(f"Added object with track ID {tid} to ChromaDB with metadata: {{'video_name': {video_name}, 'first_seen': {first_seen}, 'last_seen': {last_seen}, 'type': 'object'}}")
 
 
 def create_embeddings_for_crops(state: TrackState) -> None:
@@ -155,3 +200,55 @@ def create_embeddings_using_multimodel_model(state: TrackState) -> None:
         state.all_embeddings[tid] = outputs.cpu().numpy().flatten().tolist()
 
 
+def select_best_crops(crops: list, top_k: int = TOP_K_CROPS) -> list:
+    """Select top-K crops by confidence, spread across time."""
+    if len(crops) <= top_k:
+        return crops
+
+    # Sort by confidence descending
+    sorted_crops = sorted(crops, key=lambda x: x["confidence"], reverse=True)
+
+    # Take top 2*K by confidence, then spread across time
+    candidates = sorted_crops[:top_k * 2]
+    candidates.sort(key=lambda x: x["frame_num"])
+
+    # Evenly sample across time
+    indices = np.linspace(0, len(candidates) - 1, top_k, dtype=int)
+    return [candidates[i] for i in indices]
+
+
+def get_embeddings_for_storage(crops: list, batch_size=EMBEDDING_BATCH_SIZE) -> list:
+    """Return individual embeddings for top-K crops (not averaged)."""
+    if not crops:
+        return []
+
+    best_crops = select_best_crops(crops)
+
+    model, processor = get_clip_model()
+    all_embeddings = []
+
+    images = [crop["image"] for crop in best_crops]
+
+    for i in range(0, len(images), batch_size):
+        batch = images[i:i + batch_size]
+        inputs = processor(images=batch, return_tensors="pt", padding=True).to(DEVICE)
+        with torch.no_grad():
+            emb = model.get_image_features(**inputs)
+            emb = emb / emb.norm(dim=-1, keepdim=True)
+            all_embeddings.append(emb.cpu())
+
+    stacked = torch.cat(all_embeddings, dim=0)
+    return stacked.numpy().tolist()  # list of embeddings
+
+
+def get_image_embedding_dinov2(model, processor, images, device=DEVICE):
+    """DINOv2 image embedding — for Re-ID."""
+    if not isinstance(images, list):
+        images = [images]
+
+    inputs = processor(images=images, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(**inputs)
+        # Use CLS token embedding
+        emb = outputs.last_hidden_state[:, 0, :]
+    return F.normalize(emb, p=2, dim=-1)

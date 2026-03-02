@@ -14,6 +14,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 CLIP_MODEL_NAME = "openai/clip-vit-base-patch16"
 RFDETR_RESOLUTION = 640
 VIDEO_LLAVA_MODEL_NAME = "LanguageBind/Video-LLaVA-7B-hf"
+SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
+DINOV2_MODEL_NAME = "facebook/dinov2-base" 
 
 # ── ChromaDB ─────────────────────────────────────────────────────────────
 CHROMA_DB_PATH = "./video_index_db"
@@ -30,16 +32,19 @@ UPLOADED_VIDEOS_DIR = "./data/uploaded_videos"
 VIDEO_REGISTRY_PATH = "./video_registry.json"
 
 # ── Detection & Tracking ─────────────────────────────────────────────────
-DETECTION_INTERVAL = 3              # Run RF-DETR every N frames
+DETECTION_INTERVAL = 5           # Run RF-DETR every N frames
 DETECTION_THRESHOLD = 0.3
-LOST_TRACK_BUFFER = 180             # ByteTrack lost-track buffer (frames)
+LOST_TRACK_BUFFER = 150             # ByteTrack lost-track buffer (frames)
 LOST_FRAME_THRESHOLD = 60           # Frames before a track is finalised
+REID_THRESHOLD = 0.75              # Cosine similarity threshold for Re-ID matching
+REID_MAX_LOST_AGE = 300          # Max frames to keep a lost track in the Re-ID pool (10 seconds at 30fps)
 
 # ── Cropping & Embedding ─────────────────────────────────────────────────
 CROP_TARGET_SIZE = 224               # Resize crops to this square
 CROP_PADDING_PERCENT = 0.2           # Bounding-box padding
 EMBEDDING_BATCH_SIZE = 32            # Batch size for CLIP image embedding
-CROP_INTERVAL_DIVISOR = 2          # Crop every N frames (N = fps / divisor)
+CROP_INTERVAL_DIVISOR = 5          # Crop every N frames (N = fps / divisor)
+TOP_K_CROPS = 5                      # Max crops to keep per track for embedding
 
 # ── Stationary filter ────────────────────────────────────────────────────
 STATIONARY_THRESHOLD_PX = 3        # Pixel distance to be considered "moving"
