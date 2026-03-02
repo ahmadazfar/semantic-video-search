@@ -13,7 +13,10 @@ A real-time video object detection, tracking, and natural-language search system
 
 
 
-https://github.com/user-attachments/assets/215cfe89-56a8-48fa-9f7c-47aea1e467b2
+
+https://github.com/user-attachments/assets/fc3a65a4-12ee-487f-b404-024a3e17c07f
+
+
 
 
 
@@ -165,6 +168,7 @@ All tunable parameters live in [src/config.py](src/config.py):
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 "# semantic-video-search" 
+
 
 
 
