@@ -10,7 +10,11 @@ A real-time video object detection, tracking, and natural-language search system
 ---
 ## Demo
 
-Uploading Video Search AI - Google Chrome 2026-03-02 09-48-38.mp4…
+
+
+
+https://github.com/user-attachments/assets/215cfe89-56a8-48fa-9f7c-47aea1e467b2
+
 
 
 ## Features
@@ -161,5 +165,6 @@ All tunable parameters live in [src/config.py](src/config.py):
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 "# semantic-video-search" 
+
 
 
