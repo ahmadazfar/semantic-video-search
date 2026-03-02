@@ -8,6 +8,10 @@ A real-time video object detection, tracking, and natural-language search system
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
+## Demo
+
+Uploading Video Search AI - Google Chrome 2026-03-02 09-48-38.mp4…
+
 
 ## Features
 
@@ -157,4 +161,5 @@ All tunable parameters live in [src/config.py](src/config.py):
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 "# semantic-video-search" 
+
 
